@@ -6,7 +6,7 @@ POC de planejamento de rotas de entrega para lojistas (somente Brasil).
 
 - Java 21 (o Maven vem pelo wrapper `backend/mvnw`, não precisa instalar)
 - Docker + Docker Compose (no macOS, Colima com pelo menos 4 GB: `colima start --memory 4`)
-- Node 20+ (frontend, etapa futura)
+- Node 20+ (frontend)
 
 ## Banco local
 
@@ -36,6 +36,18 @@ Com Colima, o Testcontainers precisa saber onde está o socket:
 export DOCKER_HOST=unix://$HOME/.colima/default/docker.sock
 export TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE=/var/run/docker.sock
 ```
+
+## Frontend
+
+```bash
+cd frontend
+npm install
+npm run dev        # http://localhost:5173
+npm test           # Vitest
+npm run build
+```
+
+A URL do backend vem de `VITE_API_URL` (ver `frontend/.env.example`); em branco, usa `http://localhost:8080`.
 
 ## OSRM local (opcional)
 
