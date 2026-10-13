@@ -5,6 +5,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 import jakarta.persistence.AttributeOverride;
@@ -123,6 +124,27 @@ public class RoutePlan {
 		this.routeGeometry = routeGeometry;
 	}
 
+	public Optional<RouteStop> findStop(int visitOrder) {
+		return stops.stream().filter(stop -> stop.getVisitOrder() == visitOrder).findFirst();
+	}
+
+	/**
+	 * Recalcula o status a partir das paradas: nenhuma marcada → PLANEJADA; alguma marcada → EM_ANDAMENTO; todas
+	 * marcadas (entregues ou não) → CONCLUIDA.
+	 */
+	public void refreshStatus() {
+		long pending = stops.stream().filter(stop -> stop.getStatus() == StopStatus.PENDENTE).count();
+		if (pending == stops.size()) {
+			status = RoutePlanStatus.PLANEJADA;
+		}
+		else if (pending == 0) {
+			status = RoutePlanStatus.CONCLUIDA;
+		}
+		else {
+			status = RoutePlanStatus.EM_ANDAMENTO;
+		}
+	}
+
 	public UUID getId() {
 		return id;
 	}
@@ -181,10 +203,6 @@ public class RoutePlan {
 
 	public RoutePlanStatus getStatus() {
 		return status;
-	}
-
-	public void setStatus(RoutePlanStatus status) {
-		this.status = status;
 	}
 
 	public List<RouteStop> getStops() {

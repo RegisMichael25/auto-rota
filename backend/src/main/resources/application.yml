@@ -5,6 +5,10 @@ spring:
     default: dev
   jpa:
     open-in-view: false
+    properties:
+      hibernate:
+        # Listagem lê as paradas de cada plano: carrega em lotes em vez de N+1.
+        default_batch_fetch_size: 50
     hibernate:
       ddl-auto: validate
   flyway:
@@ -34,6 +38,8 @@ springdoc:
     path: /swagger-ui.html
 
 app:
+  # Fuso usado para interpretar o filtro de período do histórico.
+  time-zone: America/Sao_Paulo
   external:
     viacep:
       base-url: https://viacep.com.br/ws
