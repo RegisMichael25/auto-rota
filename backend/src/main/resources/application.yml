@@ -46,6 +46,7 @@ app:
     osrm:
       base-url: http://localhost:5000
       profile: driving
+      snap-radius-m: 1000
   geocoding:
     # BRASILAPI_FIRST: ViaCEP -> BrasilAPI -> Nominatim (só se faltar coordenada)
     # NOMINATIM_FIRST: ViaCEP -> Nominatim (logradouro + número) -> BrasilAPI
@@ -101,6 +102,7 @@ app:
       user-agent: ${NOMINATIM_USER_AGENT}
     osrm:
       base-url: ${OSRM_BASE_URL:https://router.project-osrm.org}
+      snap-radius-m: ${OSRM_SNAP_RADIUS_M:1000}
   geocoding:
     strategy: ${GEOCODING_STRATEGY:BRASILAPI_FIRST}
   cors:

@@ -6,6 +6,7 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.PositiveOrZero;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
@@ -29,7 +30,11 @@ public record AppProperties(@Valid @NotNull External external, @Valid @NotNull G
 	public record Nominatim(@NotBlank String baseUrl, @NotBlank String userAgent, @PositiveOrZero long minIntervalMs) {
 	}
 
-	public record Osrm(@NotBlank String baseUrl, @NotBlank String profile) {
+	/**
+	 * @param snapRadiusM raio máximo (m) para encaixar cada ponto numa via; além dele o ponto é tratado como sem
+	 * acesso por estrada (sem isso o OSRM encaixa em vias a centenas de km).
+	 */
+	public record Osrm(@NotBlank String baseUrl, @NotBlank String profile, @Positive int snapRadiusM) {
 	}
 
 	public record Geocoding(@NotNull GeocodingStrategy strategy) {
