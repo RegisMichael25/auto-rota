@@ -56,7 +56,8 @@ app:
   geocoding:
     # BRASILAPI_FIRST: ViaCEP -> BrasilAPI -> Nominatim (só se faltar coordenada)
     # NOMINATIM_FIRST: ViaCEP -> Nominatim (logradouro + número) -> BrasilAPI
-    strategy: BRASILAPI_FIRST
+    # Padrão NOMINATIM_FIRST: a BrasilAPI costuma devolver o centro da cidade para CEPs distintos.
+    strategy: NOMINATIM_FIRST
   optimizer:
     # DISTANCE (economia de combustível) ou DURATION (tempo de entrega)
     metric: DISTANCE
@@ -116,7 +117,7 @@ app:
       base-url: ${OSRM_BASE_URL:https://router.project-osrm.org}
       snap-radius-m: ${OSRM_SNAP_RADIUS_M:1000}
   geocoding:
-    strategy: ${GEOCODING_STRATEGY:BRASILAPI_FIRST}
+    strategy: ${GEOCODING_STRATEGY:NOMINATIM_FIRST}
   optimizer:
     metric: ${OPTIMIZER_METRIC:DISTANCE}
   fuel:
