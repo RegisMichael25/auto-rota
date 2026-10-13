@@ -99,6 +99,23 @@ class ViaCepClientTest extends PostgresIntegrationTest {
 	}
 
 	@Test
+	void responseWithoutCityIsTreatedAsOutageAndNotCached() {
+		WIREMOCK.stubFor(get(urlPathEqualTo(PATH)).willReturn(okJson("{\"cep\": \"01001-000\", \"logradouro\": \"Praça da Sé\"}")));
+
+		assertThatThrownBy(() -> client.lookup("01001000")).isInstanceOf(ExternalServiceUnavailableException.class);
+		assertThat(cache.count()).isZero();
+	}
+
+	@Test
+	void nonJsonResponseIsTreatedAsOutage() {
+		WIREMOCK.stubFor(get(urlPathEqualTo(PATH)).willReturn(aResponse().withStatus(200)
+			.withHeader("Content-Type", "text/html")
+			.withBody("<html>manutenção</html>")));
+
+		assertThatThrownBy(() -> client.lookup("01001000")).isInstanceOf(ExternalServiceUnavailableException.class);
+	}
+
+	@Test
 	void slowResponseTimesOutAsDomainError() {
 		WIREMOCK.stubFor(get(urlPathEqualTo(PATH)).willReturn(aResponse().withFixedDelay(1500)
 			.withHeader("Content-Type", "application/json")

@@ -79,6 +79,14 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
 		return problem;
 	}
 
+	/** Último recurso: sem detalhes internos na resposta; a causa fica no log. */
+	@ExceptionHandler(Exception.class)
+	ProblemDetail unexpected(Exception ex) {
+		log.error("Erro inesperado", ex);
+		return problem(HttpStatus.INTERNAL_SERVER_ERROR, "Erro interno",
+				"Ocorreu um erro inesperado. Tente novamente em instantes.", "INTERNAL_ERROR");
+	}
+
 	@Override
 	protected ResponseEntity<Object> handleMethodArgumentNotValid(MethodArgumentNotValidException ex,
 			HttpHeaders headers, HttpStatusCode status, WebRequest request) {

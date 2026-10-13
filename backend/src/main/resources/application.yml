@@ -50,7 +50,8 @@ app:
       user-agent: auto-rota-poc/0.0.1 (dev)
       min-interval-ms: 1000
     osrm:
-      base-url: http://localhost:5000
+      # Sem OSRM local: OSRM_BASE_URL=https://router.project-osrm.org
+      base-url: ${OSRM_BASE_URL:http://localhost:5000}
       profile: driving
       snap-radius-m: 1000
   geocoding:

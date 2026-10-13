@@ -1,5 +1,7 @@
 package br.com.autorota.client;
 
+import java.util.Locale;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -49,9 +51,21 @@ public class ViaCepClient {
 		}
 
 		ViaCepResponse response = fetch(cep);
-		CepCache entry = (response == null || Boolean.TRUE.equals(response.erro())) ? CepCache.notFound(key, cep)
-				: new CepCache(key, cep, true, blankToNull(response.logradouro()), blankToNull(response.complemento()),
-						blankToNull(response.bairro()), response.localidade(), response.uf());
+		CepCache entry;
+		if (response == null || Boolean.TRUE.equals(response.erro())) {
+			entry = CepCache.notFound(key, cep);
+		}
+		else if (blankToNull(response.localidade()) == null || response.uf() == null
+				|| !response.uf().trim().matches("[A-Za-z]{2}")) {
+			// Resposta fora do contrato: não vai para o cache (o CHECK do banco a rejeitaria) e não vira "não encontrado".
+			throw new ExternalServiceUnavailableException(SERVICE,
+					new IllegalStateException("ViaCEP sem cidade/UF válidas para o CEP " + cep));
+		}
+		else {
+			entry = new CepCache(key, cep, true, blankToNull(response.logradouro()),
+					blankToNull(response.complemento()), blankToNull(response.bairro()), response.localidade().trim(),
+					response.uf().trim().toUpperCase(Locale.ROOT));
+		}
 		save(entry);
 		return toAddress(entry);
 	}

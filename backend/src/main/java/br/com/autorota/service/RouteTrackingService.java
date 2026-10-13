@@ -58,7 +58,7 @@ public class RouteTrackingService {
 
 	@Transactional
 	public RoutePlan markDelivered(UUID id, int visitOrder, String note) {
-		RoutePlan plan = get(id);
+		RoutePlan plan = lockForUpdate(id);
 		stop(plan, visitOrder).markDelivered(Instant.now(), blankToNull(note));
 		plan.refreshStatus();
 		return plan;
@@ -66,10 +66,14 @@ public class RouteTrackingService {
 
 	@Transactional
 	public RoutePlan markNotDelivered(UUID id, int visitOrder, String note) {
-		RoutePlan plan = get(id);
+		RoutePlan plan = lockForUpdate(id);
 		stop(plan, visitOrder).markNotDelivered(blankToNull(note));
 		plan.refreshStatus();
 		return plan;
+	}
+
+	private RoutePlan lockForUpdate(UUID id) {
+		return routePlans.findForUpdateById(id).orElseThrow(() -> notFound(id));
 	}
 
 	private static RouteStop stop(RoutePlan plan, int visitOrder) {
