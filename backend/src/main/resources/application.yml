@@ -12,6 +12,10 @@ spring:
     locations: classpath:db/migration
   cache:
     type: simple
+  http:
+    client:
+      connect-timeout: 5s
+      read-timeout: 10s
 
 server:
   port: ${PORT:8080}
@@ -60,6 +64,10 @@ spring:
   config:
     activate:
       on-profile: test
+  http:
+    client:
+      connect-timeout: 1s
+      read-timeout: 1s
 app:
   external:
     viacep:
