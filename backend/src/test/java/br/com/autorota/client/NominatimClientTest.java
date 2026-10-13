@@ -113,7 +113,7 @@ class NominatimClientTest extends PostgresIntegrationTest {
 				interval.toMillis());
 		var custom = new AppProperties(
 				new AppProperties.External(external.viacep(), external.brasilapi(), nominatim, external.osrm()),
-				properties.cors());
+				properties.geocoding(), properties.cors());
 		return new NominatimClient(restClientBuilder, custom, cache);
 	}
 

@@ -13,7 +13,8 @@ import org.springframework.validation.annotation.Validated;
 
 @Validated
 @ConfigurationProperties(prefix = "app")
-public record AppProperties(@Valid @NotNull External external, @Valid @NotNull Cors cors) {
+public record AppProperties(@Valid @NotNull External external, @Valid @NotNull Geocoding geocoding,
+		@Valid @NotNull Cors cors) {
 
 	public record External(
 			@Valid @NotNull Endpoint viacep,
@@ -29,6 +30,17 @@ public record AppProperties(@Valid @NotNull External external, @Valid @NotNull C
 	}
 
 	public record Osrm(@NotBlank String baseUrl, @NotBlank String profile) {
+	}
+
+	public record Geocoding(@NotNull GeocodingStrategy strategy) {
+	}
+
+	/**
+	 * Ordem dos provedores de coordenadas. A BrasilAPI dá uma coordenada por CEP (às vezes aproximada, sem considerar
+	 * o número); o Nominatim geocodifica logradouro + número, mas é limitado a 1 req/s.
+	 */
+	public enum GeocodingStrategy {
+		BRASILAPI_FIRST, NOMINATIM_FIRST
 	}
 
 	public record Cors(@NotEmpty List<String> allowedOrigins) {

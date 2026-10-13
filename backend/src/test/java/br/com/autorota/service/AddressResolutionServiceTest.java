@@ -5,6 +5,7 @@ import static com.github.tomakehurst.wiremock.client.WireMock.anyUrl;
 import static com.github.tomakehurst.wiremock.client.WireMock.get;
 import static com.github.tomakehurst.wiremock.client.WireMock.getRequestedFor;
 import static com.github.tomakehurst.wiremock.client.WireMock.okJson;
+import static com.github.tomakehurst.wiremock.client.WireMock.serviceUnavailable;
 import static com.github.tomakehurst.wiremock.client.WireMock.urlPathEqualTo;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -14,8 +15,14 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
 import br.com.autorota.PostgresIntegrationTest;
+import br.com.autorota.client.BrasilApiClient;
+import br.com.autorota.client.NominatimClient;
+import br.com.autorota.client.ViaCepClient;
+import br.com.autorota.config.AppProperties;
+import br.com.autorota.config.AppProperties.GeocodingStrategy;
 import br.com.autorota.domain.AddressNotGeocodedException;
 import br.com.autorota.domain.CoordSource;
+import br.com.autorota.domain.ExternalServiceUnavailableException;
 import br.com.autorota.repository.CepCacheRepository;
 import br.com.autorota.repository.GeocodeCacheRepository;
 
@@ -27,6 +34,12 @@ class AddressResolutionServiceTest extends PostgresIntegrationTest {
 
 	private static final String NOMINATIM = "/nominatim/search";
 
+	private static final String PAULISTA_1000 = "[{\"lat\": \"-23.5649\", \"lon\": \"-46.6519\"}]";
+
+	private static final String BRASILAPI_COORDS = """
+			{"location": {"coordinates": {"longitude": "-46.6361", "latitude": "-23.5475"}}}
+			""";
+
 	@Autowired
 	private AddressResolutionService service;
 
@@ -35,6 +48,18 @@ class AddressResolutionServiceTest extends PostgresIntegrationTest {
 
 	@Autowired
 	private GeocodeCacheRepository geocodeCache;
+
+	@Autowired
+	private ViaCepClient viaCep;
+
+	@Autowired
+	private BrasilApiClient brasilApi;
+
+	@Autowired
+	private NominatimClient nominatim;
+
+	@Autowired
+	private AppProperties properties;
 
 	@BeforeEach
 	void setUp() {
@@ -47,29 +72,32 @@ class AddressResolutionServiceTest extends PostgresIntegrationTest {
 	}
 
 	@Test
+	void defaultStrategyIsBrasilApiFirst() {
+		assertThat(properties.geocoding().strategy()).isEqualTo(GeocodingStrategy.BRASILAPI_FIRST);
+	}
+
+	@Test
 	void usesBrasilApiCoordinatesWithoutCallingNominatim() {
-		WIREMOCK.stubFor(get(urlPathEqualTo(BRASILAPI)).willReturn(okJson("""
-				{"location": {"coordinates": {"longitude": "-46.6544", "latitude": "-23.5632"}}}
-				""")));
+		WIREMOCK.stubFor(get(urlPathEqualTo(BRASILAPI)).willReturn(okJson(BRASILAPI_COORDS)));
 
 		var resolved = service.resolve("01310-100", " 1000 ");
 
 		assertThat(resolved.coordSource()).isEqualTo(CoordSource.BRASILAPI);
 		assertThat(resolved.address().getNumber()).isEqualTo("1000");
 		assertThat(resolved.address().getStreet()).isEqualTo("Avenida Paulista");
-		assertThat(resolved.address().getLat()).isEqualTo(-23.5632);
+		assertThat(resolved.address().getLat()).isEqualTo(-23.5475);
 		WIREMOCK.verify(0, getRequestedFor(urlPathEqualTo(NOMINATIM)));
 	}
 
 	@Test
 	void fallsBackToNominatimWhenBrasilApiHasNoCoordinates() {
 		WIREMOCK.stubFor(get(urlPathEqualTo(BRASILAPI)).willReturn(okJson("{\"location\": {\"coordinates\": {}}}")));
-		WIREMOCK.stubFor(get(urlPathEqualTo(NOMINATIM)).willReturn(okJson("[{\"lat\": \"-23.5614\", \"lon\": \"-46.6559\"}]")));
+		WIREMOCK.stubFor(get(urlPathEqualTo(NOMINATIM)).willReturn(okJson(PAULISTA_1000)));
 
 		var resolved = service.resolve("01310100", "1000");
 
 		assertThat(resolved.coordSource()).isEqualTo(CoordSource.NOMINATIM);
-		assertThat(resolved.address().getLng()).isEqualTo(-46.6559);
+		assertThat(resolved.address().getLng()).isEqualTo(-46.6519);
 	}
 
 	@Test
@@ -83,7 +111,7 @@ class AddressResolutionServiceTest extends PostgresIntegrationTest {
 	@Test
 	void repeatedResolutionMakesNoExternalRequest() {
 		WIREMOCK.stubFor(get(urlPathEqualTo(BRASILAPI)).willReturn(okJson("{}")));
-		WIREMOCK.stubFor(get(urlPathEqualTo(NOMINATIM)).willReturn(okJson("[{\"lat\": \"-23.5614\", \"lon\": \"-46.6559\"}]")));
+		WIREMOCK.stubFor(get(urlPathEqualTo(NOMINATIM)).willReturn(okJson(PAULISTA_1000)));
 		service.resolve("01310100", "1000");
 		WIREMOCK.resetRequests();
 
@@ -96,6 +124,65 @@ class AddressResolutionServiceTest extends PostgresIntegrationTest {
 	@Test
 	void numberIsRequired() {
 		assertThatThrownBy(() -> service.resolve("01310100", " ")).isInstanceOf(IllegalArgumentException.class);
+	}
+
+	@Test
+	void nominatimFirstUsesNominatimWithoutCallingBrasilApi() {
+		WIREMOCK.stubFor(get(urlPathEqualTo(NOMINATIM)).willReturn(okJson(PAULISTA_1000)));
+
+		var resolved = nominatimFirst().resolve("01310100", "1000");
+
+		assertThat(resolved.coordSource()).isEqualTo(CoordSource.NOMINATIM);
+		assertThat(resolved.address().getLat()).isEqualTo(-23.5649);
+		WIREMOCK.verify(0, getRequestedFor(urlPathEqualTo(BRASILAPI)));
+	}
+
+	@Test
+	void nominatimFirstFallsBackToBrasilApiWhenNotFound() {
+		WIREMOCK.stubFor(get(urlPathEqualTo(NOMINATIM)).willReturn(okJson("[]")));
+		WIREMOCK.stubFor(get(urlPathEqualTo(BRASILAPI)).willReturn(okJson(BRASILAPI_COORDS)));
+
+		var resolved = nominatimFirst().resolve("01310100", "1000");
+
+		assertThat(resolved.coordSource()).isEqualTo(CoordSource.BRASILAPI);
+	}
+
+	@Test
+	void nominatimFirstFallsBackToBrasilApiWhenNominatimIsDown() {
+		WIREMOCK.stubFor(get(urlPathEqualTo(NOMINATIM)).willReturn(serviceUnavailable()));
+		WIREMOCK.stubFor(get(urlPathEqualTo(BRASILAPI)).willReturn(okJson(BRASILAPI_COORDS)));
+
+		var resolved = nominatimFirst().resolve("01310100", "1000");
+
+		assertThat(resolved.coordSource()).isEqualTo(CoordSource.BRASILAPI);
+	}
+
+	@Test
+	void nominatimFirstReportsOutageWhenBrasilApiHasNoCoordinates() {
+		WIREMOCK.stubFor(get(urlPathEqualTo(NOMINATIM)).willReturn(serviceUnavailable()));
+		WIREMOCK.stubFor(get(urlPathEqualTo(BRASILAPI)).willReturn(okJson("{}")));
+
+		assertThatThrownBy(() -> nominatimFirst().resolve("01310100", "1000"))
+			.isInstanceOf(ExternalServiceUnavailableException.class);
+	}
+
+	@Test
+	void nominatimFirstUsesBrasilApiFirstForCityWideCep() {
+		WIREMOCK.stubFor(get(urlPathEqualTo("/viacep/ws/35460000/json/")).willReturn(okJson("""
+				{"cep": "35460-000", "logradouro": "", "bairro": "", "localidade": "Brumadinho", "uf": "MG"}
+				""")));
+		WIREMOCK.stubFor(get(urlPathEqualTo("/brasilapi/api/cep/v2/35460000")).willReturn(okJson(BRASILAPI_COORDS)));
+
+		var resolved = nominatimFirst().resolve("35460000", "10");
+
+		assertThat(resolved.coordSource()).isEqualTo(CoordSource.BRASILAPI);
+		WIREMOCK.verify(0, getRequestedFor(urlPathEqualTo(NOMINATIM)));
+	}
+
+	private AddressResolutionService nominatimFirst() {
+		var custom = new AppProperties(properties.external(),
+				new AppProperties.Geocoding(GeocodingStrategy.NOMINATIM_FIRST), properties.cors());
+		return new AddressResolutionService(viaCep, brasilApi, nominatim, custom);
 	}
 
 }
