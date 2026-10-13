@@ -51,6 +51,12 @@ app:
     # BRASILAPI_FIRST: ViaCEP -> BrasilAPI -> Nominatim (só se faltar coordenada)
     # NOMINATIM_FIRST: ViaCEP -> Nominatim (logradouro + número) -> BrasilAPI
     strategy: BRASILAPI_FIRST
+  optimizer:
+    # DISTANCE (economia de combustível) ou DURATION (tempo de entrega)
+    metric: DISTANCE
+  fuel:
+    default-consumption-km-per-l: 10.00
+    default-price-per-l: 6.000
   cors:
     allowed-origins: http://localhost:5173
 
@@ -105,5 +111,10 @@ app:
       snap-radius-m: ${OSRM_SNAP_RADIUS_M:1000}
   geocoding:
     strategy: ${GEOCODING_STRATEGY:BRASILAPI_FIRST}
+  optimizer:
+    metric: ${OPTIMIZER_METRIC:DISTANCE}
+  fuel:
+    default-consumption-km-per-l: ${FUEL_DEFAULT_CONSUMPTION_KM_PER_L:10.00}
+    default-price-per-l: ${FUEL_DEFAULT_PRICE_PER_L:6.000}
   cors:
     allowed-origins: ${CORS_ALLOWED_ORIGINS}

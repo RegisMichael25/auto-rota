@@ -181,7 +181,8 @@ class AddressResolutionServiceTest extends PostgresIntegrationTest {
 
 	private AddressResolutionService nominatimFirst() {
 		var custom = new AppProperties(properties.external(),
-				new AppProperties.Geocoding(GeocodingStrategy.NOMINATIM_FIRST), properties.cors());
+				new AppProperties.Geocoding(GeocodingStrategy.NOMINATIM_FIRST), properties.optimizer(), properties.fuel(),
+				properties.cors());
 		return new AddressResolutionService(viaCep, brasilApi, nominatim, custom);
 	}
 

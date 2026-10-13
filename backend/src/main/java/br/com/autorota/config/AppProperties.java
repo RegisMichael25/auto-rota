@@ -1,5 +1,6 @@
 package br.com.autorota.config;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 import jakarta.validation.Valid;
@@ -12,10 +13,12 @@ import jakarta.validation.constraints.PositiveOrZero;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.validation.annotation.Validated;
 
+import br.com.autorota.optimizer.OptimizationMetric;
+
 @Validated
 @ConfigurationProperties(prefix = "app")
 public record AppProperties(@Valid @NotNull External external, @Valid @NotNull Geocoding geocoding,
-		@Valid @NotNull Cors cors) {
+		@Valid @NotNull Optimizer optimizer, @Valid @NotNull Fuel fuel, @Valid @NotNull Cors cors) {
 
 	public record External(
 			@Valid @NotNull Endpoint viacep,
@@ -46,6 +49,15 @@ public record AppProperties(@Valid @NotNull External external, @Valid @NotNull G
 	 */
 	public enum GeocodingStrategy {
 		BRASILAPI_FIRST, NOMINATIM_FIRST
+	}
+
+	/** Métrica minimizada na ordem de visita. */
+	public record Optimizer(@NotNull OptimizationMetric metric) {
+	}
+
+	/** Premissas de combustível usadas quando a requisição não informa as suas. */
+	public record Fuel(@NotNull @Positive BigDecimal defaultConsumptionKmPerL,
+			@NotNull @Positive BigDecimal defaultPricePerL) {
 	}
 
 	public record Cors(@NotEmpty List<String> allowedOrigins) {
