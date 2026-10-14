@@ -3,3 +3,8 @@
 !.env.example
 .DS_Store
 osrm-data/
+
+# Skills de agentes instaladas localmente (npx skills add)
+.agents/
+.claude/skills/
+skills-lock.json

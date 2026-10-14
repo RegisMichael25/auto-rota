@@ -41,14 +41,19 @@ class SchemaIntegrationTest extends PostgresIntegrationTest {
 	private EntityManager em;
 
 	@Test
-	void flywayAppliesV1() {
+	void flywayAppliesMigrations() {
 		var applied = jdbc.queryForList(
 				"SELECT version FROM flyway_schema_history WHERE success ORDER BY installed_rank", String.class);
-		assertThat(applied).containsExactly("1");
+		assertThat(applied).containsExactly("1", "2");
 
 		var tables = jdbc.queryForList(
 				"SELECT table_name FROM information_schema.tables WHERE table_schema = 'public'", String.class);
 		assertThat(tables).contains("route_plan", "route_stop", "cep_cache", "geocode_cache");
+
+		var withoutRls = jdbc.queryForList(
+				"SELECT relname FROM pg_class WHERE relnamespace = 'public'::regnamespace AND relkind = 'r' AND NOT relrowsecurity",
+				String.class);
+		assertThat(withoutRls).isEmpty();
 	}
 
 	@Test
