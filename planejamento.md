@@ -26,7 +26,9 @@
 
 ### Riscos?
 
-    Rotas de posicao geografica nao possivel por veiculos terrestres
+    Rotas de distâncias fora do alcance do lojista
+    Qualquer pessoa com acesso a URL poder acessar o sistema
+    Perigos de RLS
 
 ### O que o sistema precisa fazer? 
 
