@@ -10,6 +10,59 @@ Sem login, sem cadastro e sem custo: só serviços gratuitos (ViaCEP, BrasilAPI,
 | `frontend/` | React + Vite + TypeScript, react-leaflet, React Query |
 | `docker-compose.yml` | PostgreSQL local e OSRM local (opcional) |
 
+## Ferramentas e serviços utilizados
+
+Tudo é gratuito; nenhum serviço exige cadastro, chave de API ou cartão.
+
+### Serviços externos (APIs públicas)
+
+| Serviço | Para quê | Endereço |
+|---|---|---|
+| **ViaCEP** | Endereço do CEP (logradouro, bairro, cidade, UF) | `https://viacep.com.br/ws/{cep}/json/` |
+| **BrasilAPI** (CEP v2) | Coordenada do CEP, usada como último recurso (costuma ser o centro da cidade) | `https://brasilapi.com.br/api/cep/v2/{cep}` |
+| **Nominatim** (OpenStreetMap) | Geocodificação de logradouro + número + cidade; limite de 1 req/s e `User-Agent` identificado | `https://nominatim.openstreetmap.org` |
+| **OSRM** | Matriz de distâncias e tempos (`/table`) e geometria da rota (`/route`) | Local (Docker) ou servidor público `https://router.project-osrm.org` |
+| **Tiles do OpenStreetMap** | Imagens do mapa no frontend | `https://tile.openstreetmap.org` |
+| **Geofabrik** | Download dos mapas do Brasil por região para o OSRM local | `https://download.geofabrik.de/south-america/brazil/` |
+
+### Backend
+
+| Ferramenta | Uso |
+|---|---|
+| Java 21 | Linguagem |
+| Spring Boot 3.5 (Web, Validation, Data JPA, Cache, Actuator) | API REST, validação, acesso ao banco, health check |
+| Spring `RestClient` | Chamadas às APIs externas, com timeout |
+| Flyway | Única fonte do schema do banco (migrations SQL) |
+| PostgreSQL 16 | Banco de dados (local em Docker; Supabase em produção) |
+| springdoc-openapi 2.8 | Documentação da API e Swagger UI |
+| Maven Wrapper | Build sem instalar o Maven |
+| JUnit 5, AssertJ, Spring Boot Test | Testes |
+| Testcontainers | PostgreSQL real nos testes |
+| WireMock 3 | Simula ViaCEP, BrasilAPI, Nominatim e OSRM nos testes |
+
+### Frontend
+
+| Ferramenta | Uso |
+|---|---|
+| React 19 + TypeScript | Interface |
+| Vite | Servidor de desenvolvimento e build |
+| Leaflet + react-leaflet | Mapa, marcadores numerados e linha da rota |
+| TanStack React Query | Chamadas à API com loading, erro e cache |
+| React Router | Páginas: planejar, histórico e detalhe da rota |
+| Vitest + Testing Library + jsdom | Testes |
+| oxlint | Lint |
+
+### Infraestrutura
+
+| Ferramenta | Uso |
+|---|---|
+| Docker + Docker Compose | PostgreSQL e OSRM locais |
+| Colima (macOS) | Runtime do Docker usado no desenvolvimento |
+| Imagem `ghcr.io/project-osrm/osrm-backend:v6.0.0` | OSRM local |
+| Supabase (plano gratuito) | Banco em produção (etapa 10, pendente) |
+| Render | Hospedagem do backend em Docker (etapa 11, pendente) |
+| Vercel | Hospedagem do frontend (etapa 11, pendente) |
+
 ## Pré-requisitos
 
 - **Java 21**. O Maven vem pelo wrapper (`backend/mvnw`); não precisa instalar.
