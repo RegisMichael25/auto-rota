@@ -59,9 +59,9 @@ Tudo é gratuito; nenhum serviço exige cadastro, chave de API ou cartão.
 | Docker + Docker Compose | PostgreSQL e OSRM locais |
 | Colima (macOS) | Runtime do Docker usado no desenvolvimento |
 | Imagem `ghcr.io/project-osrm/osrm-backend:v6.0.0` | OSRM local |
-| Supabase (plano gratuito) | Banco em produção (etapa 10, pendente) |
-| Render | Hospedagem do backend em Docker (etapa 11, pendente) |
-| Vercel | Hospedagem do frontend (etapa 11, pendente) |
+| Supabase (plano gratuito) | Banco em produção |
+| Render (plano gratuito) | Hospedagem do backend em Docker (`render.yaml`) |
+| Vercel (plano Hobby) | Hospedagem do frontend (`frontend/vercel.json`) |
 
 ## Pré-requisitos
 
@@ -175,6 +175,48 @@ npm run build      # gera dist/
 
 A URL do backend vem de `VITE_API_URL` (ver `frontend/.env.example`). Em branco, usa `http://localhost:8080`. O backend só aceita chamadas das origens em `app.cors.allowed-origins` (em dev, `http://localhost:5173`).
 
+## Deploy gratuito
+
+Banco no Supabase, backend no Render e frontend na Vercel, todos em planos gratuitos.
+
+### Banco (Supabase)
+
+1. Crie um projeto na região `sa-east-1` e defina a senha do banco.
+2. Em **Connect**, copie a string do **Session pooler**. A conexão direta (`db.<ref>.supabase.co`) só tem IPv6 e o Render não alcança.
+3. Converta para JDBC: `jdbc:postgresql://<host-do-pooler>:5432/postgres?sslmode=require`. O usuário é `postgres.<ref>`.
+
+O Flyway cria e atualiza o schema quando o backend sobe. A V2 liga RLS sem políticas: a Data API do Supabase fica sem acesso às tabelas, e o backend, que conecta como dono, não é afetado.
+
+### Backend (Render)
+
+O `render.yaml` na raiz define o serviço: Docker (`backend/Dockerfile`), plano Free e health check em `/actuator/health`.
+
+1. No Render: **New → Blueprint** e conecte o repositório.
+2. Preencha `DATABASE_URL`, `DATABASE_USERNAME`, `DATABASE_PASSWORD`, `NOMINATIM_USER_AGENT` e `CORS_ALLOWED_ORIGINS` (URL da Vercel; até ter a URL, use `http://localhost:5173`).
+
+Para testar a imagem localmente:
+
+```bash
+cd backend
+docker build -t auto-rota-backend:local .
+docker run --rm -p 8080:8080 -m 512m --env-file ../.env auto-rota-backend:local
+curl http://localhost:8080/actuator/health
+```
+
+### Frontend (Vercel)
+
+1. Na Vercel: **Add New → Project**, importe o repositório e defina **Root Directory** como `frontend`. O preset Vite é detectado.
+2. Defina `VITE_API_URL` com a URL do Render, sem barra no final, e faça o deploy.
+3. Volte ao Render, troque `CORS_ALLOWED_ORIGINS` pela URL da Vercel e salve, o que reinicia o serviço.
+
+O `frontend/vercel.json` manda toda rota para o `index.html`, para que endereços como `/rotas/{id}` funcionem ao recarregar a página.
+
+### Limites dos planos gratuitos
+
+- **Render Free:** o serviço dorme após 15 minutos sem acesso; a primeira requisição depois disso leva cerca de 1 minuto. 512 MB de memória.
+- **Supabase Free:** o projeto é pausado após 7 dias sem uso e pode ser reativado no painel (depois de muito tempo pausado, deixa de poder).
+- **Vercel Hobby:** apenas uso não comercial.
+
 ## Variáveis de ambiente
 
 Os nomes estão em `.env.example` (backend e Compose) e `frontend/.env.example`. Nunca versione valores reais.
@@ -188,6 +230,7 @@ Os nomes estão em `.env.example` (backend e Compose) e `frontend/.env.example`.
 | `NOMINATIM_BASE_URL` | prod | `https://nominatim.openstreetmap.org` | Instância do Nominatim |
 | `OSRM_BASE_URL` | dev e prod | dev `http://localhost:5000`; prod `https://router.project-osrm.org` | Servidor OSRM |
 | `OSRM_SNAP_RADIUS_M` | prod | `1000` | Distância máxima (m) para encaixar um ponto numa via |
+| `DB_POOL_MAX_SIZE` | prod | `5` | Máximo de conexões do pool com o banco |
 | `GEOCODING_STRATEGY` | prod | `NOMINATIM_FIRST` | `NOMINATIM_FIRST` ou `BRASILAPI_FIRST` |
 | `OPTIMIZER_METRIC` | prod | `DISTANCE` | Minimizar `DISTANCE` (combustível) ou `DURATION` (tempo) |
 | `FUEL_DEFAULT_CONSUMPTION_KM_PER_L` | prod | `10.00` | Consumo quando o pedido não informa |

@@ -1,0 +1,26 @@
+# Blueprint do Render: backend em Docker no plano gratuito.
+# Segredos e valores por ambiente ficam com sync: false (preenchidos no painel, nunca aqui).
+services:
+  - type: web
+    name: auto-rota-backend
+    runtime: docker
+    plan: free
+    # Render não tem região na América do Sul; virginia (us-east) é a mais próxima do Supabase sa-east-1.
+    region: virginia
+    rootDir: backend
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /actuator/health
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: DATABASE_USERNAME
+        sync: false
+      - key: DATABASE_PASSWORD
+        sync: false
+      - key: NOMINATIM_USER_AGENT
+        sync: false
+      - key: CORS_ALLOWED_ORIGINS
+        sync: false
+      - key: DB_POOL_MAX_SIZE
+        value: "5"

@@ -109,6 +109,14 @@ spring:
     url: ${DATABASE_URL}
     username: ${DATABASE_USERNAME}
     password: ${DATABASE_PASSWORD}
+    hikari:
+      # O pooler do Supabase Free aceita poucas conexões; 512 MB no Render também pedem pool pequeno.
+      maximum-pool-size: ${DB_POOL_MAX_SIZE:5}
+
+server:
+  # Atrás do proxy do Render: respeita X-Forwarded-* (Swagger e redirecionamentos em https).
+  forward-headers-strategy: native
+
 app:
   external:
     nominatim:
