@@ -18,50 +18,55 @@ Tudo é gratuito; nenhum serviço exige cadastro, chave de API ou cartão.
 
 | Serviço | Para quê | Endereço |
 |---|---|---|
-| **ViaCEP** | Endereço do CEP (logradouro, bairro, cidade, UF) | `https://viacep.com.br/ws/{cep}/json/` |
-| **BrasilAPI** (CEP v2) | Coordenada do CEP, usada como último recurso (costuma ser o centro da cidade) | `https://brasilapi.com.br/api/cep/v2/{cep}` |
-| **Nominatim** (OpenStreetMap) | Geocodificação de logradouro + número + cidade; limite de 1 req/s e `User-Agent` identificado | `https://nominatim.openstreetmap.org` |
-| **OSRM** | Matriz de distâncias e tempos (`/table`) e geometria da rota (`/route`) | Local (Docker) ou servidor público `https://router.project-osrm.org` |
-| **Tiles do OpenStreetMap** | Imagens do mapa no frontend | `https://tile.openstreetmap.org` |
-| **Geofabrik** | Download dos mapas do Brasil por região para o OSRM local | `https://download.geofabrik.de/south-america/brazil/` |
+| **ViaCEP** | É o primeiro passo de todo endereço. O usuário digita só CEP e número; o ViaCEP devolve logradouro, bairro, cidade e UF. Isso preenche o formulário na hora (o usuário confere se o CEP está certo) e fornece a rua e a cidade que o Nominatim precisa para achar o ponto no mapa. CEP inexistente vira o aviso "CEP não encontrado". | `https://viacep.com.br/ws/{cep}/json/` |
+| **BrasilAPI** (CEP v2) | Fonte reserva de coordenadas. Às vezes traz latitude e longitude do CEP, mas costuma devolver o centro da cidade, então só é usada quando o Nominatim não acha o endereço ou está fora do ar. Também resolve CEPs gerais de cidade, que não têm logradouro. | `https://brasilapi.com.br/api/cep/v2/{cep}` |
+| **Nominatim** (OpenStreetMap) | Transforma "rua + número + cidade" em latitude e longitude (geocodificação). É o que coloca cada parada no lugar certo do mapa e permite calcular distâncias reais. O sistema só aceita resultados na cidade do CEP (evita ruas com o mesmo nome em cidades vizinhas). A política de uso exige no máximo 1 consulta por segundo e identificação no `User-Agent`; por isso há fila e cache. | `https://nominatim.openstreetmap.org` |
+| **OSRM** | Motor de rotas que calcula distâncias e tempos **de estrada**, não em linha reta. O `/table` devolve a matriz "de cada ponto para cada ponto", usada para decidir a melhor ordem de visita. O `/route` devolve o desenho da rota na ordem escolhida (a linha no mapa) e a distância e o tempo de cada trecho, que viram os totais e o cálculo de combustível. | Local (Docker) ou servidor público `https://router.project-osrm.org` |
+| **Tiles do OpenStreetMap** | As imagens do mapa (ruas, bairros, nomes) que aparecem ao fundo, sobre as quais o frontend desenha os marcadores e a linha da rota. | `https://tile.openstreetmap.org` |
+| **Geofabrik** | Distribui o mapa do Brasil em arquivos por região. Só é usado para quem roda o OSRM local: baixa-se a região (ex.: Sudeste) e o OSRM a pré-processa para responder rotas sem depender do servidor público. | `https://download.geofabrik.de/south-america/brazil/` |
 
 ### Backend
 
-| Ferramenta | Uso |
+| Ferramenta | Para quê |
 |---|---|
-| Java 21 | Linguagem |
-| Spring Boot 3.5 (Web, Validation, Data JPA, Cache, Actuator) | API REST, validação, acesso ao banco, health check |
-| Spring `RestClient` | Chamadas às APIs externas, com timeout |
-| Flyway | Única fonte do schema do banco (migrations SQL) |
-| PostgreSQL 16 | Banco de dados (local em Docker; Supabase em produção) |
-| springdoc-openapi 2.8 | Documentação da API e Swagger UI |
-| Maven Wrapper | Build sem instalar o Maven |
-| JUnit 5, AssertJ, Spring Boot Test | Testes |
-| Testcontainers | PostgreSQL real nos testes |
-| WireMock 3 | Simula ViaCEP, BrasilAPI, Nominatim e OSRM nos testes |
+| **Java 21** | Linguagem do servidor. Versão LTS, com records e recursos modernos que deixam o código mais curto. |
+| **Spring Boot 3.5** | Base da aplicação: sobe o servidor HTTP e reúne os módulos abaixo com configuração por perfil (`dev`, `test`, `prod`). |
+| Spring Web | Expõe a API REST (`/api/routes`, `/api/cep`) que o frontend consome. |
+| Spring Validation | Valida os dados recebidos (CEP com 8 dígitos, 1 a 10 destinos, consumo e preço positivos) e devolve mensagens em português por campo. |
+| Spring Data JPA (Hibernate) | Lê e grava rotas, paradas e caches no banco sem SQL manual para o dia a dia. |
+| Spring Actuator | Endpoint `/actuator/health`, usado para saber se o backend está no ar (e, no deploy, pelo Render). |
+| Spring Cache | Habilitado conforme a stack; os caches que importam (CEP e geocodificação) ficam no banco para sobreviver a reinícios. |
+| Spring `RestClient` | Faz as chamadas ao ViaCEP, BrasilAPI, Nominatim e OSRM com timeout, para uma API lenta não travar o sistema. |
+| **Flyway** | Cria e evolui as tabelas do banco a partir de arquivos SQL versionados. É a única fonte do schema: o mesmo script vale para o banco local e para o Supabase. |
+| **PostgreSQL 16** | Guarda o histórico de rotas, as paradas com status de entrega e os caches das APIs externas. Local em Docker; Supabase em produção. |
+| **springdoc-openapi** | Gera a documentação da API e o Swagger UI (`/swagger-ui.html`), onde dá para testar cada endpoint pelo navegador. |
+| **Maven Wrapper** (`mvnw`) | Compila, testa e empacota o backend sem precisar instalar o Maven. |
+| JUnit 5, AssertJ, Spring Boot Test | Escrevem e rodam os testes automáticos do backend. |
+| **Testcontainers** | Sobe um PostgreSQL de verdade, descartável, durante os testes, para testar as migrations e as consultas no mesmo banco da produção. |
+| **WireMock** | Simula ViaCEP, BrasilAPI, Nominatim e OSRM nos testes. Assim os testes não dependem da internet e conseguem reproduzir erros (fora do ar, lentidão, CEP inexistente). |
 
 ### Frontend
 
-| Ferramenta | Uso |
+| Ferramenta | Para quê |
 |---|---|
-| React 19 + TypeScript | Interface |
-| Vite | Servidor de desenvolvimento e build |
-| Leaflet + react-leaflet | Mapa, marcadores numerados e linha da rota |
-| TanStack React Query | Chamadas à API com loading, erro e cache |
-| React Router | Páginas: planejar, histórico e detalhe da rota |
-| Vitest + Testing Library + jsdom | Testes |
-| oxlint | Lint |
+| **React 19 + TypeScript** | Monta as telas (planejar, rota, histórico). O TypeScript confere em tempo de compilação que os dados usados batem com o formato da API. |
+| **Vite** | Servidor de desenvolvimento com recarga instantânea e build otimizado (`dist/`) para publicar na Vercel. |
+| **Leaflet + react-leaflet** | Biblioteca de mapas: mostra os tiles do OpenStreetMap, os marcadores numerados na ordem de visita (com cor por status de entrega) e a linha da rota. |
+| **TanStack React Query** | Cuida das chamadas à API: estados de carregando e erro, cache (um CEP já consultado não é buscado de novo), nova tentativa em falha de rede e atualização da tela após marcar uma entrega. |
+| **React Router** | Navegação entre as páginas e endereços próprios para cada rota (`/rotas/{id}`) e para os filtros do histórico, que podem ser compartilhados ou recarregados. |
+| **Vitest + Testing Library + jsdom** | Testes automáticos das telas como o usuário as usa (digitar CEP, clicar em botões), sem abrir um navegador. |
+| **oxlint** | Aponta erros comuns e código suspeito no TypeScript. |
 
 ### Infraestrutura
 
-| Ferramenta | Uso |
+| Ferramenta | Para quê |
 |---|---|
-| Docker + Docker Compose | PostgreSQL e OSRM locais |
-| Colima (macOS) | Runtime do Docker usado no desenvolvimento |
-| Imagem `ghcr.io/project-osrm/osrm-backend:v6.0.0` | OSRM local |
-| Supabase (plano gratuito) | Banco em produção (etapa 10, pendente) |
-| Render | Hospedagem do backend em Docker (etapa 11, pendente) |
-| Vercel | Hospedagem do frontend (etapa 11, pendente) |
+| **Docker + Docker Compose** | Sobe com um comando o PostgreSQL e o OSRM locais, iguais em qualquer máquina, sem instalar nada além do Docker. |
+| **Colima** (macOS) | Executa o Docker no Mac sem o Docker Desktop. |
+| Imagem `ghcr.io/project-osrm/osrm-backend:v6.0.0` | Imagem oficial do OSRM: pré-processa o mapa da Geofabrik e responde as consultas de rota localmente. |
+| **Supabase** (plano gratuito) | PostgreSQL gerenciado para produção: banco acessível pela internet, com backups, sem manter servidor. Etapa 10, pendente. |
+| **Render** | Hospeda o backend a partir de uma imagem Docker e o deixa acessível por HTTPS. Etapa 11, pendente. |
+| **Vercel** | Hospeda o frontend (arquivos estáticos do build do Vite) com HTTPS e CDN. Etapa 11, pendente. |
 
 ## Pré-requisitos
 
