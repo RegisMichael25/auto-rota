@@ -10,6 +10,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.time.Duration;
+import java.util.Optional;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -40,6 +41,15 @@ class NominatimClientTest extends PostgresIntegrationTest {
 
 	private static final String FARIA_LIMA = "Avenida Brigadeiro Faria Lima";
 
+	private static final String RUA_C_PASSARE = """
+			[{"lat": "-3.8008", "lon": "-38.5394", "address": {"road": "Rua C", "suburb": "Passaré", "city": "Fortaleza", "postcode": "60861-000"}}]
+			""";
+
+	/** Resultado de CEP no Nominatim: sem cidade, com bairro e CEP. */
+	private static final String CEP_LAGUNA_PARK = """
+			[{"lat": "-3.8223", "lon": "-38.4680", "address": {"suburb": "Lagoa Redonda", "postcode": "60831-227"}}]
+			""";
+
 	@Autowired
 	private NominatimClient client;
 
@@ -61,7 +71,7 @@ class NominatimClientTest extends PostgresIntegrationTest {
 	void geocodesInBrazilWithIdentifiedUserAgent() {
 		WIREMOCK.stubFor(get(urlPathEqualTo(PATH)).willReturn(okJson(FOUND)));
 
-		var result = client.geocode("Avenida Paulista", "1000", "São Paulo", "SP");
+		var result = geocode(client, "Avenida Paulista", "1000", "São Paulo", "SP");
 
 		assertThat(result).contains(new Coordinates(-23.5614, -46.6559));
 		WIREMOCK.verify(getRequestedFor(urlPathEqualTo(PATH))
@@ -80,7 +90,7 @@ class NominatimClientTest extends PostgresIntegrationTest {
 		WIREMOCK.stubFor(get(urlPathEqualTo(PATH)).withQueryParam("q", equalTo(FARIA_LIMA + ", São Paulo, SP, Brasil"))
 			.willReturn(okJson(FARIA_LIMA_STREET)));
 
-		var result = client.geocode(FARIA_LIMA, "1500", "São Paulo", "SP");
+		var result = geocode(client, FARIA_LIMA, "1500", "São Paulo", "SP");
 
 		assertThat(result).contains(new Coordinates(-23.5868, -46.6819));
 		WIREMOCK.verify(2, getRequestedFor(urlPathEqualTo(PATH)));
@@ -92,15 +102,15 @@ class NominatimClientTest extends PostgresIntegrationTest {
 				[{"lat": "-25.4284", "lon": "-49.2733", "address": {"town": "SAO JOSE DOS PINHAIS"}}]
 				""")));
 
-		assertThat(client.geocode("Rua XV", "10", "São José dos Pinhais", "PR")).isPresent();
+		assertThat(geocode(client, "Rua XV", "10", "São José dos Pinhais", "PR")).isPresent();
 	}
 
 	@Test
 	void notFoundInCityAfterRetryIsCachedAsNotFound() {
 		WIREMOCK.stubFor(get(urlPathEqualTo(PATH)).willReturn(okJson(GUARULHOS)));
 
-		assertThat(client.geocode(FARIA_LIMA, "1500", "São Paulo", "SP")).isEmpty();
-		assertThat(client.geocode(FARIA_LIMA, "1500", "São Paulo", "SP")).isEmpty();
+		assertThat(geocode(client, FARIA_LIMA, "1500", "São Paulo", "SP")).isEmpty();
+		assertThat(geocode(client, FARIA_LIMA, "1500", "São Paulo", "SP")).isEmpty();
 
 		WIREMOCK.verify(2, getRequestedFor(urlPathEqualTo(PATH)));
 		assertThat(cache.findAll()).singleElement()
@@ -111,8 +121,8 @@ class NominatimClientTest extends PostgresIntegrationTest {
 	void repeatedQueryHitsCache() {
 		WIREMOCK.stubFor(get(urlPathEqualTo(PATH)).willReturn(okJson(FOUND)));
 
-		client.geocode("Avenida Paulista", "1000", "São Paulo", "SP");
-		var second = client.geocode("avenida  paulista", "1000", "são paulo", "sp");
+		geocode(client, "Avenida Paulista", "1000", "São Paulo", "SP");
+		var second = geocode(client, "avenida  paulista", "1000", "são paulo", "sp");
 
 		assertThat(second).isPresent();
 		WIREMOCK.verify(1, getRequestedFor(urlPathEqualTo(PATH)));
@@ -122,8 +132,8 @@ class NominatimClientTest extends PostgresIntegrationTest {
 	void notFoundIsCached() {
 		WIREMOCK.stubFor(get(urlPathEqualTo(PATH)).willReturn(okJson("[]")));
 
-		assertThat(client.geocode("Rua Inexistente", "1", "Lugar Nenhum", "SP")).isEmpty();
-		assertThat(client.geocode("Rua Inexistente", "1", "Lugar Nenhum", "SP")).isEmpty();
+		assertThat(geocode(client, "Rua Inexistente", "1", "Lugar Nenhum", "SP")).isEmpty();
+		assertThat(geocode(client, "Rua Inexistente", "1", "Lugar Nenhum", "SP")).isEmpty();
 
 		// com número + sem número; a segunda chamada vem do cache
 		WIREMOCK.verify(2, getRequestedFor(urlPathEqualTo(PATH)));
@@ -133,7 +143,7 @@ class NominatimClientTest extends PostgresIntegrationTest {
 	void unavailableServiceThrowsDomainError() {
 		WIREMOCK.stubFor(get(urlPathEqualTo(PATH)).willReturn(serviceUnavailable()));
 
-		assertThatThrownBy(() -> client.geocode("Avenida Paulista", "1000", "São Paulo", "SP"))
+		assertThatThrownBy(() -> geocode(client, "Avenida Paulista", "1000", "São Paulo", "SP"))
 			.isInstanceOf(ExternalServiceUnavailableException.class);
 		assertThat(cache.count()).isZero();
 	}
@@ -143,9 +153,9 @@ class NominatimClientTest extends PostgresIntegrationTest {
 		WIREMOCK.stubFor(get(urlPathEqualTo(PATH)).willReturn(okJson(FOUND)));
 		var limited = clientWithInterval(Duration.ofMillis(400));
 
-		limited.geocode("Rua A", "1", "São Paulo", "SP");
+		geocode(limited, "Rua A", "1", "São Paulo", "SP");
 		long start = System.nanoTime();
-		limited.geocode("Rua B", "2", "São Paulo", "SP");
+		geocode(limited, "Rua B", "2", "São Paulo", "SP");
 		long elapsedMs = Duration.ofNanos(System.nanoTime() - start).toMillis();
 
 		assertThat(elapsedMs).isGreaterThanOrEqualTo(380);
@@ -155,6 +165,61 @@ class NominatimClientTest extends PostgresIntegrationTest {
 	@Test
 	void buildsQueryWithoutStreetForCityWideCep() {
 		assertThat(NominatimClient.buildQuery(null, "10", "Cidade", "MG")).isEqualTo("Cidade, MG, Brasil");
+	}
+
+	@Test
+	void rejectsHomonymousStreetInAnotherNeighborhoodAndFallsBackToCep() {
+		// "Rua C" existe em dezenas de bairros de Fortaleza; no OSM, a do Laguna Park se chama Rua Santa Isabel.
+		WIREMOCK.stubFor(get(urlPathEqualTo(PATH)).withQueryParam("q", equalTo("Rua C 576, Fortaleza, CE, Brasil"))
+			.willReturn(okJson(RUA_C_PASSARE)));
+		WIREMOCK.stubFor(get(urlPathEqualTo(PATH)).withQueryParam("q", equalTo("Rua C, Fortaleza, CE, Brasil"))
+			.willReturn(okJson(RUA_C_PASSARE)));
+		WIREMOCK.stubFor(get(urlPathEqualTo(PATH)).withQueryParam("q", equalTo("60831-227, Fortaleza, CE, Brasil"))
+			.willReturn(okJson(CEP_LAGUNA_PARK)));
+
+		var result = client.geocode("Rua C", "576", "Lagoa Redonda", "Fortaleza", "CE", "60831-227");
+
+		assertThat(result).contains(new Coordinates(-3.8223, -38.4680));
+		WIREMOCK.verify(3, getRequestedFor(urlPathEqualTo(PATH)));
+	}
+
+	@Test
+	void acceptsResultInExpectedNeighborhoodIgnoringAccentsAndJoinedNames() {
+		WIREMOCK.stubFor(get(urlPathEqualTo(PATH)).willReturn(okJson("""
+				[{"lat": "-3.8008", "lon": "-38.5394", "address": {"city": "Fortaleza", "suburb": "Passaré"}},
+				 {"lat": "-3.7922", "lon": "-38.4596", "address": {"city": "Fortaleza", "suburb": "Sapiranga / Coité"}}]
+				""")));
+
+		var result = client.geocode("Rua C", "10", "SAPIRANGA", "Fortaleza", "CE", "60833000");
+
+		assertThat(result).contains(new Coordinates(-3.7922, -38.4596));
+		WIREMOCK.verify(1, getRequestedFor(urlPathEqualTo(PATH)));
+	}
+
+	@Test
+	void acceptsResultWithSameCepEvenWithoutCityOrNeighborhood() {
+		WIREMOCK.stubFor(get(urlPathEqualTo(PATH)).willReturn(okJson(CEP_LAGUNA_PARK)));
+
+		assertThat(client.geocode("Rua C", "576", "Lagoa Redonda", "Fortaleza", "CE", "60831227"))
+			.contains(new Coordinates(-3.8223, -38.4680));
+	}
+
+	@Test
+	void cepSearchOnlyAcceptsExactCep() {
+		WIREMOCK.stubFor(get(urlPathEqualTo(PATH)).willReturn(okJson(RUA_C_PASSARE)));
+		WIREMOCK.stubFor(get(urlPathEqualTo(PATH)).withQueryParam("q", equalTo("60831-227, Fortaleza, CE, Brasil"))
+			.willReturn(okJson("""
+					[{"lat": "-3.8300", "lon": "-38.4600", "address": {"suburb": "Lagoa Redonda", "postcode": "60831-496"}}]
+					""")));
+
+		assertThat(client.geocode("Rua C", "576", "Lagoa Redonda", "Fortaleza", "CE", "60831-227")).isEmpty();
+		WIREMOCK.verify(3, getRequestedFor(urlPathEqualTo(PATH)));
+	}
+
+	/** Sem bairro e sem CEP: só a cidade é conferida e não há busca por CEP. */
+	private static Optional<Coordinates> geocode(NominatimClient client, String street, String number,
+			String city, String uf) {
+		return client.geocode(street, number, null, city, uf, null);
 	}
 
 	private NominatimClient clientWithInterval(Duration interval) {

@@ -68,7 +68,8 @@ public class AddressResolutionService {
 		if (fromBrasilApi.isPresent()) {
 			return toResolved(found, number, fromBrasilApi.get(), CoordSource.BRASILAPI);
 		}
-		Coordinates coordinates = nominatim.geocode(found.street(), number, found.city(), found.uf())
+		Coordinates coordinates = nominatim.geocode(found.street(), number, found.neighborhood(), found.city(), found.uf(),
+				found.cep())
 			.orElseThrow(() -> new AddressNotGeocodedException(found.cep(), number));
 		return toResolved(found, number, coordinates, CoordSource.NOMINATIM);
 	}
@@ -78,7 +79,8 @@ public class AddressResolutionService {
 		Optional<Coordinates> fromNominatim;
 		ExternalServiceUnavailableException nominatimFailure = null;
 		try {
-			fromNominatim = nominatim.geocode(found.street(), number, found.city(), found.uf());
+			fromNominatim = nominatim.geocode(found.street(), number, found.neighborhood(), found.city(), found.uf(),
+				found.cep());
 		}
 		catch (ExternalServiceUnavailableException ex) {
 			log.warn("Nominatim indisponível para o CEP {}; tentando BrasilAPI", found.cep());

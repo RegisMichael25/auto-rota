@@ -155,7 +155,7 @@ Erros seguem a RFC 7807 (`ProblemDetail`) com um campo `code` estável: `VALIDAT
 ### Como a rota é calculada
 
 1. ViaCEP dá o endereço do CEP.
-2. Coordenadas: por padrão o Nominatim geocodifica logradouro + número, aceitando só resultados na cidade do CEP; se o número não existir no OpenStreetMap, usa um ponto da própria rua; se nada servir, usa a BrasilAPI. A ordem é configurável (`GEOCODING_STRATEGY`).
+2. Coordenadas: por padrão o Nominatim geocodifica logradouro + número. Só vale resultado com o mesmo CEP ou na cidade e no bairro do ViaCEP, porque nomes genéricos ("Rua C") se repetem em vários bairros. Se o número não existir no OpenStreetMap, usa um ponto da própria rua; se a rua não for achada (por exemplo, loteamento renomeado, com nome antigo nos Correios e oficial no OSM), busca pelo CEP e aceita só o CEP exato; se nada servir, usa a BrasilAPI. A ordem é configurável (`GEOCODING_STRATEGY`).
 3. OSRM `/table` dá a matriz de distâncias e tempos.
 4. Vizinho mais próximo seguido de 2-opt escolhe a ordem (origem fixa no início; na rota circular, também no fim).
 5. OSRM `/route` dá a geometria e os trechos; os totais somam os trechos, incluindo a volta.
@@ -245,7 +245,7 @@ Em dev, as demais propriedades ficam em `backend/src/main/resources/application.
 ## Limitações conhecidas
 
 - **Serviços públicos gratuitos, sem garantia.** O servidor de demonstração do OSRM e o Nominatim público têm limites de uso e podem ficar lentos ou fora do ar; nesses casos a API responde 503. Não servem para produção com volume real.
-- **Nominatim: 1 requisição por segundo.** Cada endereço novo pode levar até cerca de 2 s (com número e, se preciso, só a rua). Uma rota com 10 endereços inéditos pode passar de 10 s. Endereços repetidos vêm do cache. O limite vale por instância do backend; com várias instâncias, o total passaria de 1 req/s.
+- **Nominatim: 1 requisição por segundo.** Cada endereço novo pode levar até cerca de 3 s (com número, só a rua e, se preciso, o CEP). Uma rota com 10 endereços inéditos pode passar de 10 s. Endereços repetidos vêm do cache. O limite vale por instância do backend; com várias instâncias, o total passaria de 1 req/s.
 - **Precisão do endereço.** Se o OpenStreetMap não tiver o número, o ponto fica em algum trecho da rua, não na porta. A BrasilAPI costuma devolver o centro da cidade, por isso fica como último recurso. CEP geral de cidade (sem logradouro) usa a coordenada da cidade.
 - **Cache sem expiração.** `cep_cache` e `geocode_cache` não expiram; um CEP alterado nos Correios ou um endereço corrigido no OpenStreetMap só é relido apagando a linha correspondente.
 - **OSRM local regional.** Com uma região da Geofabrik, rotas que saem dela não são encontradas (422).
