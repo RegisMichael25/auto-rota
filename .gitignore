@@ -1,6 +1,7 @@
 .env
 .env.*
 !.env.example
+!frontend/.env.production
 .DS_Store
 osrm-data/
 

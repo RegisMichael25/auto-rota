@@ -173,7 +173,7 @@ npm test           # Vitest + Testing Library
 npm run build      # gera dist/
 ```
 
-A URL do backend vem de `VITE_API_URL` (ver `frontend/.env.example`). Em branco, usa `http://localhost:8080`. O backend só aceita chamadas das origens em `app.cors.allowed-origins` (em dev, `http://localhost:5173`).
+A URL do backend vem de `VITE_API_URL` (ver `frontend/.env.example`). Em branco, usa `http://localhost:8080`. No build de produção (`npm run build`), vale `frontend/.env.production`, que aponta para o backend publicado. O backend só aceita chamadas das origens em `app.cors.allowed-origins` (em dev, `http://localhost:5173`).
 
 ## Deploy gratuito
 
@@ -206,7 +206,7 @@ curl http://localhost:8080/actuator/health
 ### Frontend (Vercel)
 
 1. Na Vercel: **Add New → Project**, importe o repositório e defina **Root Directory** como `frontend`. O preset Vite é detectado.
-2. Defina `VITE_API_URL` com a URL do Render, sem barra no final, e faça o deploy.
+2. A URL do backend vem de `frontend/.env.production`; se o backend mudar de endereço, atualize esse arquivo ou defina `VITE_API_URL` no projeto da Vercel (tem prioridade, mas exige Redeploy). Faça o deploy.
 3. Volte ao Render, troque `CORS_ALLOWED_ORIGINS` pela URL da Vercel e salve, o que reinicia o serviço.
 
 O `frontend/vercel.json` manda toda rota para o `index.html`, para que endereços como `/rotas/{id}` funcionem ao recarregar a página.
